@@ -1,10 +1,147 @@
 body {
     font-family: Arial, sans-serif;
-    text-align: center;
+    margin: 0;
+    background: #f4f4f4;
+}
+
+.navbar {
+    background: #222;
+    color: white;
+    padding: 12px 20px;
+    display: flex;
+    justify-content: space-between;
+}
+
+.nav-left,
+.nav-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.nav-left a {
+    font-weight: 600;
+}
+
+.navbar a {
+    color: white;
+    margin-right: 0;
+    text-decoration: none;
+}
+
+.page-container {
     padding: 20px;
 }
 
-button {
-    padding: 10px 20px;
-    font-size: 16px;
+a.active {
+    text-decoration: underline;
+}
+
+/* Cards */
+.card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 15px;
+}
+
+.card {
+    background: white;
+    padding: 15px;
+    border-radius: 8px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
+.card h3 {
+    margin-top: 0;
+}
+
+.button {
+    display: inline-block;
+    margin-top: 10px;
+    padding: 10px;
+    background: #0077ff;
+    color: white;
+    text-decoration: none;
+    border-radius: 6px;
+}
+
+/* Forms */
+.form-card {
+    background: white;
+    padding: 20px;
+    max-width: 400px;
+    margin: auto;
+    border-radius: 8px;
+}
+
+.form-helper {
+    text-align: center;
+    margin-top: 10px;
+}
+
+.form-error {
+    max-width: 400px;
+    margin: 0 auto 12px;
+    color: #b00020;
+}
+
+.form-message {
+    max-width: 400px;
+    margin: 0 auto 12px;
+    color: #0b6b2f;
+}
+
+.form-card input,
+.form-card textarea {
+    width: 100%;
+    padding: 8px;
+    margin-bottom: 12px;
+}
+
+.option-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.option-row input {
+    flex: 1;
+    margin-bottom: 0;
+}
+
+.option-row .remove-option {
+    padding: 8px 10px;
+    background: #e74c3c;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.option-row .remove-option:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.option-list {
+    display: grid;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.option-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.option-item input[type="radio"] {
+    width: auto;
+    margin: 0;
+}
+
+.chart-container {
+    width: 60%;
+    margin: auto;
 }

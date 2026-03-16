@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="no">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Direkte avstemning</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body>
+    {% include "navbar.html" %}
+
+    <div class="page-container">
+        <h1>Direkte avstemning</h1>
+
+        <canvas id="voteChart"></canvas>
+
+        <form onsubmit="event.preventDefault(); vote(this);">
+            <label for="subject">Stem på:</label>
+            <select id="subject" name="subject">
+                {% for s in subjects %}
+                <option value="{{ s.id }}">{{ s.title }}</option>
+                {% endfor %}
+            </select>
+
+            {% if user_id %}
+            <input type="hidden" id="user_id" value="{{ user_id }}">
+            {% endif %}
+
+            <button type="submit">Stem</button>
+        </form>
+
+        <p>Totalt antall stemmer: <span id="vote-count">{{ total_votes }}</span></p>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+
+</html>

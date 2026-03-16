@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="no">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Profil</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body>
+    {% include "navbar.html" %}
+
+    <div class="page-container">
+        <h2>Din profil</h2>
+
+        {% if error %}
+        <p class="form-error">{{ error }}</p>
+        {% endif %}
+
+        {% if message %}
+        <p class="form-message">{{ message }}</p>
+        {% endif %}
+
+        <div class="card">
+            <h3>Kontoinfo</h3>
+            <p><strong>Brukernavn:</strong> {{ user.username }}</p>
+            <p><strong>E-post:</strong> {{ user.email }}</p>
+            <p><strong>Telefon:</strong> {{ user.phone or "Ikke satt" }}</p>
+        </div>
+
+        <h3>Rediger profil</h3>
+        <form method="POST" class="form-card">
+            <label>Brukernavn</label>
+            <input type="text" name="username" value="{{ user.username }}" required>
+
+            <label>E-post</label>
+            <input type="email" name="email" value="{{ user.email }}" required>
+
+            <label>Telefon</label>
+            <input type="tel" name="phone" value="{{ user.phone or '' }}">
+
+            <label>Nåværende passord</label>
+            <input type="password" name="current_password">
+
+            <label>Nytt passord</label>
+            <input type="password" name="new_password">
+
+            <label>Bekreft nytt passord</label>
+            <input type="password" name="confirm_password">
+
+            <button type="submit">Lagre endringer</button>
+        </form>
+
+        <h3>Emner du har opprettet</h3>
+        <div class="card-grid">
+            {% for subject in created_subjects %}
+            <div class="card">
+                <h3>{{ subject.title }}</h3>
+                <p>{{ subject.description }}</p>
+                <a href="/vote/{{ subject.id }}" class="button">Åpne</a>
+            </div>
+            {% endfor %}
+        </div>
+
+        <h3>Emner du har stemt på</h3>
+        <div class="card-grid">
+            {% for subject in voted_subjects %}
+            <div class="card">
+                <h3>{{ subject.title }}</h3>
+                <p>{{ subject.description }}</p>
+                <a href="/vote/{{ subject.id }}" class="button">Åpne</a>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+
+</html>

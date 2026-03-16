@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="no">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hovedmeny</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body>
+    {% include "navbar.html" %}
+
+    <div class="page-container">
+        <h2>Hovedmeny</h2>
+
+        <div class="card-grid">
+            {% for subject in subjects %}
+            <div class="card">
+                <h3>{{ subject.title }}</h3>
+                <p>{{ subject.description }}</p>
+                <a href="/vote/{{ subject.id }}" class="button">Stem</a>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+
+</html>

@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="no">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registrer</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body>
+    {% include "navbar.html" %}
+
+    <div class="page-container">
+        <h2>Registrer</h2>
+
+        {% if error %}
+        <p class="form-error">{{ error }}</p>
+        {% endif %}
+
+        <form method="POST" class="form-card">
+            <label>Brukernavn</label>
+            <input type="text" name="username" required>
+
+            <label>E-post</label>
+            <input type="email" name="email" required>
+
+            <label>Telefon</label>
+            <input type="tel" name="phone" required>
+
+            <label>Passord</label>
+            <input type="password" name="password" required>
+
+            <label>Bekreft passord</label>
+            <input type="password" name="confirm_password" required>
+
+            <button type="submit">Opprett konto</button>
+        </form>
+
+        <p class="form-helper">
+            Har du allerede en konto? <a href="{{ url_for('login') }}">Logg inn her</a>
+        </p>
+    </div>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+
+</html>

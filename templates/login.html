@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="no">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Logg inn</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body>
+    <nav class="navbar">
+        <div class="nav-left">
+            <a href="/login">Stemmesystem</a>
+        </div>
+        <div class="nav-right">
+            <a href="/login">Logg inn</a>
+            <a href="/register">Registrer</a>
+        </div>
+    </nav>
+
+    <div class="page-container">
+        <h2>Logg inn</h2>
+
+        {% if error %}
+        <p class="form-error">{{ error }}</p>
+        {% endif %}
+
+        {% if message %}
+        <p class="form-message">{{ message }}</p>
+        {% endif %}
+
+        <form method="POST" class="form-card">
+            <label>Brukernavn</label>
+            <input type="text" name="username" required>
+
+            <label>Passord</label>
+            <input type="password" name="password" required>
+
+            <button type="submit">Logg inn</button>
+        </form>
+
+        <p class="form-helper">
+            Ingen konto? <a href="{{ url_for('register') }}">Registrer her</a>
+        </p>
+    </div>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+
+</html>
