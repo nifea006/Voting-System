@@ -15,36 +15,35 @@
         <h2>{{ subject.title }}</h2>
         <p>{{ subject.description }}</p>
 
-        <form onsubmit="event.preventDefault(); submitVote('{{ subject.id }}')" class="form-card">
+        <div class="chart-container" id="vote-chart-container" {% if not selected_option_id %}hidden{% endif %}>
+            <canvas id="voteChart"></canvas>
+        </div>
+
+        <form onsubmit="event.preventDefault(); submitVote('{{ subject.id }}')" class="form-card"
+            data-has-voted="{{ '1' if selected_option_id else '0' }}">
             {% if subject.is_anonymous %}
             <p class="form-note">Anonym avstemning</p>
             {% endif %}
             <div class="option-list">
                 {% for option in options %}
                 <label class="option-item">
-                    <input type="radio" name="option" value="{{ option.id }}" {{ 'checked' if option.id == selected_option_id }} required>
+                    <input type="radio" name="option" value="{{ option.id }}" {{ 'checked' if
+                        option.id==selected_option_id }} required>
                     {{ option.label }}
                 </label>
                 {% endfor %}
             </div>
-            <button type="submit">Stem</button>
+            <button type="submit" id="vote-submit">Stem</button>
         </form>
 
-        <div class="chart-container">
-            <canvas id="voteChart"></canvas>
-        </div>
-
-        <p>Totalt antall stemmer: <span id="vote-count">{{ total_votes }}</span></p>
+        <p id="total-votes-row" {% if not selected_option_id %}hidden{% endif %}>
+            Totalt antall stemmer: <span id="vote-count">{{ total_votes }}</span>
+        </p>
     </div>
 
-    <script>
-        document.addEventListener("DOMContentLoaded", () => {
-            updateVoteChart({
-                options: '{{ vote_stats | tojson }}',
-                total: '{{ total_votes }}'
-            });
-        });
-    </script>
+    <div id="vote-data" data-initial-vote='{{ {"options": vote_stats, "total": total_votes} | tojson }}'
+        data-has-voted="{{ 1 if selected_option_id else 0 }}"></div>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="{{ url_for('static', filename='script.js') }}"></script>
 </body>
 

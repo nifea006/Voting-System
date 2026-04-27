@@ -20,6 +20,12 @@
                 <h3>{{ subject.title }}</h3>
                 <p>{{ subject.description }}</p>
                 <a href="/vote/{{ subject.id }}" class="button">Stem</a>
+                {% if session.get('is_admin') %}
+                <form method="POST" action="/subject/{{ subject.id }}/delete"
+                    onsubmit="return confirm('Er du sikker på at du vil slette dette emnet?')">
+                    <button type="submit" class="button button-danger">Slett</button>
+                </form>
+                {% endif %}
             </div>
             {% endfor %}
         </div>

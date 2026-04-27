@@ -17,13 +17,20 @@ function submitVote(subject_id) {
         })
     })
         .then(response => response.json())
-        .then(data => updateVoteChart(data));
+        .then(data => {
+            if (data.status !== 'success') {
+                alert(data.message);
+                return;
+            }
+            showResultsAfterVote();
+            updateVoteChart(data);
+        });
 }
 
 function updateVoteChart(votesData) {
     const list = votesData.options || votesData.subjects || [];
-    const labels = list.map(s => s.label || s.title);
-    const counts = list.map(s => s.vote_count);
+    const labels = list.map(option => option.label || option.title);
+    const counts = list.map(option => option.vote_count);
 
     document.getElementById('vote-count').textContent = votesData.total;
 
@@ -34,7 +41,7 @@ function updateVoteChart(votesData) {
             data: {
                 labels,
                 datasets: [{
-                    label: 'Stemmer',
+                    label: "Stemmer",
                     data: counts,
                     backgroundColor: 'rgba(75, 192, 192, 0.4)',
                     borderColor: 'rgba(75, 192, 192, 1)',
@@ -49,3 +56,41 @@ function updateVoteChart(votesData) {
         voteChartInstance.update();
     }
 }
+
+function showResultsAfterVote() {
+    const chartContainer = document.getElementById('vote-chart-container');
+    const totalVotesRow = document.getElementById('total-votes-row');
+    const submitButton = document.getElementById('vote-submit');
+
+    if (chartContainer) {
+        chartContainer.hidden = false;
+    }
+    if (totalVotesRow) {
+        totalVotesRow.hidden = false;
+    }
+    if (submitButton) {
+        submitButton.textContent = 'Endre stemme';
+    }
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+    const voteDataEl = document.getElementById('vote-data');
+    if (!voteDataEl) {
+        return;
+    }
+
+    const hasVoted = voteDataEl.dataset.hasVoted === '1';
+    let initialVoteData = null;
+    try {
+        initialVoteData = JSON.parse(voteDataEl.dataset.initialVote || '{}');
+    } catch (error) {
+        initialVoteData = null;
+    }
+
+    if (hasVoted) {
+        showResultsAfterVote();
+        if (initialVoteData) {
+            updateVoteChart(initialVoteData);
+        }
+    }
+});

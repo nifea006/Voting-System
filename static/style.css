@@ -37,6 +37,11 @@ a.active {
     text-decoration: underline;
 }
 
+#total-votes-row {
+    position: fixed;
+    bottom: 0;
+}
+
 /* Cards */
 .card-grid {
     display: grid;
@@ -55,14 +60,26 @@ a.active {
     margin-top: 0;
 }
 
-.button {
+.button,
+button.button {
     display: inline-block;
     margin-top: 10px;
     padding: 10px;
-    background: #0077ff;
+    background: #9f9f9f;
     color: white;
     text-decoration: none;
     border-radius: 6px;
+    border: none;
+    cursor: pointer;
+}
+
+.button-danger,
+button.button-danger {
+    background: #d64545;
+}
+
+.card form {
+    display: inline-block;
 }
 
 /* Forms */

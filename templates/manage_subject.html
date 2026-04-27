@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="no">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>
+        {% if page == 'register' %}Registrer{% else %}Opprett emne{% endif %}
+    </title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body>
+    {% include "navbar.html" %}
+
+    <div class="page-container">
+        {% if page == 'register' %}
+        <h2>Registrer</h2>
+
+        {% if error %}
+        <p class="form-error">{{ error }}</p>
+        {% endif %}
+
+        <form method="POST" class="form-card">
+            <label>Brukernavn</label>
+            <input type="text" name="username" required>
+
+            <label>E-post</label>
+            <input type="email" name="email" required>
+
+            <label>Telefon</label>
+            <input type="tel" name="phone" required>
+
+            <label>Passord</label>
+            <input type="password" name="password" required>
+
+            <label>Bekreft passord</label>
+            <input type="password" name="confirm_password" required>
+
+            <button type="submit">Opprett konto</button>
+        </form>
+
+        <p class="form-helper">
+            Har du allerede en konto? <a href="{{ url_for('login') }}">Logg inn her</a>
+        </p>
+        {% else %}
+        <h2>Opprett et nytt avstemningsemne</h2>
+
+        {% if error %}
+        <p class="form-error">{{ error }}</p>
+        {% endif %}
+
+        <form method="POST" class="form-card">
+            <label>Tittel</label>
+            <input type="text" name="title" value="{{ title or '' }}" required>
+
+            <label>Beskrivelse</label>
+            <textarea name="description">{{ description or '' }}</textarea>
+
+            <label>Alternativer (minst 2)</label>
+            <div id="options-container">
+                {% if options %}
+                {% for option in options %}
+                <div class="option-row">
+                    <input type="text" name="options" value="{{ option }}" required>
+                    <button type="button" class="remove-option">Fjern</button>
+                </div>
+                {% endfor %}
+                {% else %}
+                <div class="option-row">
+                    <input type="text" name="options" required>
+                    <button type="button" class="remove-option">Fjern</button>
+                </div>
+                <div class="option-row">
+                    <input type="text" name="options" required>
+                    <button type="button" class="remove-option">Fjern</button>
+                </div>
+                {% endif %}
+            </div>
+            <button type="button" id="add-option">Legg til alternativ</button>
+
+            <label>
+                <input type="checkbox" name="is_anonymous"> Anonym avstemning
+            </label>
+
+            <button type="submit">Opprett emne</button>
+        </form>
+        {% endif %}
+    </div>
+
+    {% if page != 'register' %}
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            const addOptionButton = document.getElementById("add-option");
+            const optionsContainer = document.getElementById("options-container");
+
+            const updateRemoveButtons = () => {
+                const rows = optionsContainer.querySelectorAll(".option-row");
+                const canRemove = rows.length > 2;
+                rows.forEach(row => {
+                    const btn = row.querySelector(".remove-option");
+                    if (btn) {
+                        btn.disabled = !canRemove;
+                        btn.style.visibility = canRemove ? "visible" : "hidden";
+                    }
+                });
+            };
+
+            if (addOptionButton && optionsContainer) {
+                addOptionButton.addEventListener("click", () => {
+                    const row = document.createElement("div");
+                    row.className = "option-row";
+
+                    const input = document.createElement("input");
+                    input.type = "text";
+                    input.name = "options";
+                    input.required = true;
+
+                    const removeButton = document.createElement("button");
+                    removeButton.type = "button";
+                    removeButton.className = "remove-option";
+                    removeButton.textContent = "Fjern";
+                    removeButton.addEventListener("click", () => {
+                        row.remove();
+                        updateRemoveButtons();
+                    });
+
+                    row.appendChild(input);
+                    row.appendChild(removeButton);
+                    optionsContainer.appendChild(row);
+                    updateRemoveButtons();
+                });
+
+                optionsContainer.addEventListener("click", (event) => {
+                    if (event.target.classList.contains("remove-option")) {
+                        const row = event.target.closest(".option-row");
+                        if (row) {
+                            row.remove();
+                            updateRemoveButtons();
+                        }
+                    }
+                });
+
+                updateRemoveButtons();
+            }
+        });
+    </script>
+    {% endif %}
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+
+</html>

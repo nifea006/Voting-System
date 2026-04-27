@@ -40,9 +40,14 @@ def create_tables():
             username VARCHAR(255) NOT NULL,
             password_hash VARCHAR(255) NOT NULL,
             email VARCHAR(255) UNIQUE NOT NULL,
-            phone VARCHAR(20) UNIQUE
+            phone VARCHAR(20) UNIQUE,
+            is_admin BOOLEAN DEFAULT FALSE
         );
     """)
+    try:
+        cursor.execute("ALTER TABLE users ADD COLUMN is_admin BOOLEAN DEFAULT FALSE;")
+    except mysql.connector.Error:
+        pass
     # Subjects Table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS subjects (
@@ -138,6 +143,7 @@ def login():
         if user and check_password_hash(user['password_hash'], password_input):
             session['user_id'] = user['id']
             session['username'] = user['username']
+            session['is_admin'] = bool(user.get('is_admin'))
             return redirect('/main-menu')
 
         return render_template('login.html', error='Ugyldig brukernavn eller passord.')
@@ -154,11 +160,14 @@ def register():
         confirm_password = request.form.get('confirm_password')
 
         if not username or not email or not password:
-            return render_template('registrering.html', error='Brukernavn, e-post og passord er påkrevd.')
+            return render_template('manage_subject.html', page='register',
+                                   error='Brukernavn, e-post og passord er påkrevd.')
         if password != confirm_password:
-            return render_template('registrering.html', error='Passordene samsvarer ikke.')
+            return render_template('manage_subject.html', page='register',
+                                   error='Passordene samsvarer ikke.')
         if len(password) < 6:
-            return render_template('registrering.html', error='Passordet må være minst 6 tegn.')
+            return render_template('manage_subject.html', page='register',
+                                   error='Passordet må være minst 6 tegn.')
 
         conn = get_db_connection()
         cursor = conn.cursor(dictionary=True)
@@ -169,7 +178,8 @@ def register():
         if existing:
             cursor.close()
             conn.close()
-            return render_template('registrering.html', error='Brukernavn eller e-post er allerede i bruk.')
+            return render_template('manage_subject.html', page='register',
+                                   error='Brukernavn eller e-post er allerede i bruk.')
 
         password_hash = generate_password_hash(password)
 
@@ -185,11 +195,12 @@ def register():
         except mysql.connector.Error:
             cursor.close()
             conn.close()
-            return render_template('registrering.html', error='Kunne ikke opprette konto. Prøv igjen.')
+            return render_template('manage_subject.html', page='register',
+                                   error='Kunne ikke opprette konto. Prøv igjen.')
 
         return redirect('/login')
 
-    return render_template('registrering.html')
+    return render_template('manage_subject.html', page='register')
 
 @app.route('/logout')
 def logout():
@@ -204,12 +215,12 @@ def main_menu():
     if 'user_id' not in session or 'username' not in session:
         return redirect('/login')
 
-    connection = get_db_connection()
-    cursor = connection.cursor(dictionary=True)
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
     cursor.execute("SELECT * FROM subjects ORDER BY created_at DESC;")
     subjects = cursor.fetchall()
     cursor.close()
-    connection.close()
+    conn.close()
 
     return render_template('hovedmeny.html', subjects=subjects)
 
@@ -225,12 +236,13 @@ def create_subject():
         title = request.form.get('title').strip()
         description = request.form.get('description').strip()
         is_anonymous = 1 if request.form.get('is_anonymous') else 0
-        options = [o.strip() for o in request.form.getlist('options') if o.strip()]
+        options = [option.strip() for option in request.form.getlist('options') if option.strip()]
 
         if not title:
-            return render_template('opprett_emne.html', error='Tittel er påkrevd.')
+            return render_template('manage_subject.html', page='create_subject',
+                                   error='Tittel er påkrevd.')
         if len(options) < 2:
-            return render_template('opprett_emne.html',
+            return render_template('manage_subject.html', page='create_subject',
                                    error='Minst 2 alternativer er påkrevd.',
                                    title=title,
                                    description=description,
@@ -255,7 +267,36 @@ def create_subject():
 
         return redirect('/main-menu')
 
-    return render_template('opprett_emne.html')
+    return render_template('manage_subject.html', page='create_subject')
+
+# --------------
+# Delete Subject
+# --------------
+@app.route('/subject/<int:subject_id>/delete', methods=['POST'])
+def delete_subject(subject_id):
+    if 'user_id' not in session or 'username' not in session:
+        return redirect('/login')
+
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    cursor.execute("SELECT id, created_by FROM subjects WHERE id = %s", (subject_id,))
+    subject = cursor.fetchone()
+    if not subject:
+        cursor.close()
+        conn.close()
+        return 'Emne ikke funnet', 404
+    if ['created_by'] != session['user_id'] and not session.get('is_admin'):
+        cursor.close()
+        conn.close()
+        return 'Du har ikke tilgang til dette emnet.', 403
+
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM subjects WHERE id = %s", (subject_id,))
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+    return redirect(request.referrer)
 
 # -----------
 # Voting page
@@ -319,6 +360,7 @@ def vote():
         cursor.execute("""
             INSERT INTO votes (subject_id, user_id, option_id)
             VALUES (%s, %s, %s)
+            ON DUPLICATE KEY UPDATE option_id = VALUES(option_id), voted_at = CURRENT_TIMESTAMP
         """, (subject_id, user_id, option_id))
         conn.commit()
         cursor.close()
@@ -328,7 +370,7 @@ def vote():
 
     vote_stats, total_votes = get_option_statistics(subject_id)
 
-    return jsonify({'status': 'success', 'total': total_votes, 'options': vote_stats})
+    return jsonify({'status': 'success', 'total': total_votes, 'options': vote_stats, 'has_voted': True})
 
 # -------
 # Profile
@@ -422,4 +464,4 @@ def profile():
 
 if __name__ == '__main__':
     create_tables()
-    app.run(debug=True)
+    app.run(host='0.0.0.0', port=5000, debug=True)
