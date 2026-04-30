@@ -54,6 +54,7 @@
 
         <h3>Emner du har opprettet</h3>
         <div class="card-grid">
+            {% if created_subjects %}
             {% for subject in created_subjects %}
             <div class="card">
                 <h3>{{ subject.title }}</h3>
@@ -65,10 +66,14 @@
                 </form>
             </div>
             {% endfor %}
+            {% else %}
+            <p>Ingen emner funnet</p>
+            {% endif %}
         </div>
 
         <h3>Emner du har stemt på</h3>
         <div class="card-grid">
+            {% if voted_subjects %}
             {% for subject in voted_subjects %}
             <div class="card">
                 <h3>{{ subject.title }}</h3>
@@ -76,6 +81,9 @@
                 <a href="/vote/{{ subject.id }}" class="button">Åpne</a>
             </div>
             {% endfor %}
+            {% else %}
+            <p>Ingen emner funnet</p>
+            {% endif %}
         </div>
     </div>
 
