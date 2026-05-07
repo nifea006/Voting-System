@@ -123,9 +123,7 @@ pip install flask mysql-connector-python python-dotenv werkzeug
 Linux / macOS:\
 pip3 install flask mysql-connector-python python-dotenv werkzeug
 
-### 3. Fillout the database properties in the [`app.py`](/app.py)
-
-Find and edit this code at line 22:
+### 3. Fillout the database properties in the [`app.py`](/app.py#L24)
 
 ```python
 # -------------------

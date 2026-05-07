@@ -15,9 +15,20 @@
         <h2>{{ subject.title }}</h2>
         <p>{{ subject.description }}</p>
 
+        <select name="selectChartType" id="selectChartType" onchange="updateVoteChart()">
+            <option value="bar">Bar</option>
+            <option value="doughnut">Doughnut</option>
+            <option value="line">Line</option>
+            <option value="polarArea">Polar Area</option>
+            <option value="radar">Radar</option>
+            <option value="scatter">Scatter</option>
+        </select>
+
         <div class="chart-container" id="vote-chart-container" {% if not selected_option_id %}hidden{% endif %}>
             <canvas id="voteChart"></canvas>
         </div>
+
+        <br>
 
         <form onsubmit="event.preventDefault(); submitVote('{{ subject.id }}')" class="form-card"
             data-has-voted="{{ '1' if selected_option_id else '0' }}">
