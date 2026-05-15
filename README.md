@@ -15,41 +15,6 @@ This is what I made:
 - A results system that calculates vote counts per option and returns live data with JSON.
 - JavaScript with `fetch()` to send votes asynchronously and update the chart without reloading the page.
 
-Example Flask route:
-
-```python
-@app.route('/vote', methods=['POST'])
-def vote():
-    if 'user_id' not in session or 'username' not in session:
-        return redirect('/login')
-
-    user_id = session['user_id']
-    subject_id = request.form.get('subject_id', type=int)
-    option_id = request.form.get('option_id', type=int)
-
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("""
-        INSERT INTO votes (subject_id, user_id, option_id)
-        VALUES (%s, %s, %s)
-        ON DUPLICATE KEY UPDATE option_id = VALUES(option_id), voted_at = CURRENT_TIMESTAMP
-    """, (subject_id, user_id, option_id))
-    conn.commit()
-    cursor.close()
-    conn.close()
-
-    vote_stats, total_votes = get_option_statistics(subject_id)
-    return jsonify({'status': 'success', 'total': total_votes, 'options': vote_stats, 'has_voted': True})
-```
-
-This function:
-
-- Checks that the user is logged in
-- Receives the selected subject and option
-- Saves the vote in the database
-- Updates the vote if the user has already voted on that subject
-- Returns updated statistics as JSON so the frontend can refresh the results instantly
-
 ### Operation
 
 I run the application locally with Flask during development.
@@ -57,26 +22,8 @@ I run the application locally with Flask during development.
 The project uses:
 
 - `Flask` for routing, templates, sessions, and backend logic
-- `MySQL` for storing users, subjects, voting options, and votes
+- `MariaDB` for storing users, subjects, voting options, and votes
 - `JavaScript` for sending votes and updating the results chart dynamically
-
-The structure is kept simple and organized with separate folders for templates and static files:
-
-```text
-Voting-System/
-├── app.py
-├── .env
-├── sample_subjects.sql
-├── static/
-│   ├── script.js
-│   └── style.css
-└── templates/
-    ├── avstemning.html
-    ├── login.html
-    ├── hovedmeny.html
-    ├── profil.html
-    └── ...
-```
 
 ### User Support
 

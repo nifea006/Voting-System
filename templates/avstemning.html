@@ -15,14 +15,14 @@
         <h2>{{ subject.title }}</h2>
         <p>{{ subject.description }}</p>
 
-        <select name="selectChartType" id="selectChartType" onchange="updateVoteChart()">
-            <option value="bar">Bar</option>
-            <option value="doughnut">Doughnut</option>
-            <option value="line">Line</option>
-            <option value="polarArea">Polar Area</option>
-            <option value="radar">Radar</option>
-            <option value="scatter">Scatter</option>
-        </select>
+        <section name="selectChartType" id="selectChartType">
+            <button type="button" class="bar" onclick="updateVoteChart(null, 'bar')">Bar</button>
+            <button type="button" class="doughnut" onclick="updateVoteChart(null, 'doughnut')">Doughnut</button>
+            <button type="button" class="line" onclick="updateVoteChart(null, 'line')">Line</button>
+            <button type="button" class="polarArea" onclick="updateVoteChart(null, 'polarArea')">Polar Area</button>
+            <button type="button" class="radar" onclick="updateVoteChart(null, 'radar')">Radar</button>
+        </section>
+
 
         <div class="chart-container" id="vote-chart-container" {% if not selected_option_id %}hidden{% endif %}>
             <canvas id="voteChart"></canvas>
@@ -56,6 +56,9 @@
         data-has-voted="{{ 1 if selected_option_id else 0 }}"></div>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+
+</html>
 </body>
 
 </html>

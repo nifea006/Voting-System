@@ -1,5 +1,6 @@
 let voteChartInstance = null;
 let currentVoteData = null;
+let currentChartType = 'bar';
 let currentChartPalette = {
     key: null,
     colors: []
@@ -39,6 +40,34 @@ function getChartColors(labels) {
     return colors;
 }
 
+function getChartOptions(chartType) {
+    const integerScale = {
+        beginAtZero: true,
+        ticks: {
+            precision: 0,
+            stepSize: 1
+        }
+    };
+
+    if (chartType === 'radar' || chartType === 'polarArea') {
+        return {
+            scales: {
+                r: integerScale
+            }
+        };
+    }
+
+    if (chartType === 'doughnut') {
+        return {};
+    }
+
+    return {
+        scales: {
+            y: integerScale
+        }
+    };
+}
+
 function submitVote(subject_id) {
     const selectedOption = document.querySelector('input[name="option"]:checked');
 
@@ -68,16 +97,19 @@ function submitVote(subject_id) {
         });
 }
 
-function updateVoteChart(votesData = currentVoteData) {
+function updateVoteChart(votesData = currentVoteData, selectedType = null) {
+    votesData = votesData || currentVoteData;
     if (!votesData) return;
 
     currentVoteData = votesData;
+    currentChartType = selectedType || currentChartType;
+    console.log("currentChartType:", currentChartType, "selectedType:", selectedType)
 
     const list = votesData.options || votesData.subjects || [];
     const labels = list.map(option => option.label || option.title);
     const counts = list.map(option => option.vote_count);
-    const chartType = document.getElementById('selectChartType').value;
-    const backgroundColor = getChartColors(labels);
+    const chartType = currentChartType;
+    const backgroundColors = getChartColors(labels);
 
     document.getElementById('vote-count').textContent = votesData.total;
 
@@ -90,23 +122,21 @@ function updateVoteChart(votesData = currentVoteData) {
                 datasets: [{
                     label: "Stemmer",
                     data: counts,
-                    backgroundColor: backgroundColor,
+                    backgroundColor: backgroundColors,
                     borderColor: "#1f2937",
                     borderWidth: 1,
                     hoverOffset: chartType === 'doughnut' ? 4 : 0
                 }]
             },
-            options: {
-                ...(chartType === 'bar' && { scales: { y: { beginAtZero: true } } })
-            }
+            options: getChartOptions(chartType)
         });
     } else {
         voteChartInstance.config.type = chartType;
         voteChartInstance.data.labels = labels;
         voteChartInstance.data.datasets[0].data = counts;
-        voteChartInstance.data.datasets[0].backgroundColor = backgroundColor;
+        voteChartInstance.data.datasets[0].backgroundColor = backgroundColors;
         voteChartInstance.data.datasets[0].hoverOffset = chartType === 'doughnut' ? 4 : 0;
-        voteChartInstance.options = chartType === 'bar' ? { scales: { y: { beginAtZero: true } } } : {};
+        voteChartInstance.options = getChartOptions(chartType);
         voteChartInstance.update();
     }
 }
