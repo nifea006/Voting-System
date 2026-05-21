@@ -1,6 +1,6 @@
 # Voting System
 
-## Digital Voting Platform with Flask and MySQL
+## Digital Voting Platform
 
 ### Development Skills
 
@@ -11,9 +11,9 @@ This is what I made:
 - A Flask-based web application with separate routes for login, registration, profile pages, voting, and subject creation.
 - A MySQL database structure for users, subjects, subject options, and votes.
 - Session-based authentication in Flask to keep users logged in securely.
-- A voting system where each user can vote once per subject, and update their vote if needed.
+- A voting system where each user can vote once per subject.
 - A results system that calculates vote counts per option and returns live data with JSON.
-- JavaScript with `fetch()` to send votes asynchronously and update the chart without reloading the page.
+- JavaScript using `chart.js` to display voting data in various chart types..
 
 ### Operation
 
@@ -41,36 +41,26 @@ I also use `session` in Flask to handle authentication and protect pages that re
 
 ## How to Run the Project
 
-### 1. Create and activate a virtual environment
+### 1. Create and activate a virtual environment and install the dependencies
 
 ```bash
 //Windows:
 python -m venv .venv
 .venv\Scripts\Activate
-
-//Linux / macOS:
-python3 -m venv .venv
-source .venv/bin/activate
+pip install -r requirements.txt
 ```
 
-### 2. Install dependencies
+### Linux / macOS
 
 ```bash
-//Windows:
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
-
-//Linux / macOS:
-pip3 install -r requirements.txt
 ```
 
-Or use this if `requirements.txt` doesn't work:\
-Windows:\
-pip install flask mysql-connector-python python-dotenv werkzeug
+### 2. Database Setup
 
-Linux / macOS:\
-pip3 install flask mysql-connector-python python-dotenv werkzeug
-
-### 3. Fillout the database properties in the [`app.py`](/app.py#L24)
+Fill out the database properties in [`app.py`](/app.py#L26). It must be a MySQL-type database such as MySQL or MariaDB.
 
 ```python
 # -------------------
@@ -85,21 +75,47 @@ def get_db_connection():
     )
 ```
 
-### 4. Start the application
+Alternatively, you can create and use a .env file to store the database properties:
 
-```powershell
-//Windows:
-python app.py
-
-//Linux / macOS:
-python3 app.py
+```text
+    DB_HOST = "localhost"
+    DB_USER = "your_user_name"
+    DB_PASSWORD = "your_password"
+    DB_VOTING_SYSTEM = "your_database_name"
 ```
 
-The app will start on:
+### 3. Run the App
 
-[http://127.0.0.1:5000](/http://127.0.0.1:5000)
+After the database has been set up:
 
-When the project starts:
+```powershell
+    python app.py
+```
 
-- `create_tables()` creates the required tables if they do not already exist
-- `seed_sample_subjects()` loads example subjects from `sample_subjects.sql` if the `subjects` table is empty
+The app runs at:
+
+```text
+    http://127.0.0.1:5000
+```
+
+## Example Data Notes
+
+Example data is loaded from [`sample_subjects.sql`](/sample_subjects.sql).
+
+It includes:
+
+- 10 users
+- Multiple example voting subjects
+- Subject options
+- Example votes
+
+Use example data on a clean database for best results. If your database already contains conflicting users or subjects, the sample inserts may fail.
+You cannot log in as any of the example users.
+
+To become an admin, register on the website and grant yourself admin privileges through the database:
+
+```sql
+UPDATE users 
+SET is_admin = 1 
+WHERE username = 'your_username';
+```

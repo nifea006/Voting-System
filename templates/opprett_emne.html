@@ -27,90 +27,48 @@
 
             <label>Alternativer (minst 2)</label>
             <div id="options-container">
-                {% if options %}
-                {% for option in options %}
-                <div class="option-row">
-                    <input type="text" name="options" value="{{ option }}" required>
-                    <button type="button" class="remove-option">Fjern</button>
-                </div>
-                {% endfor %}
-                {% else %}
                 <div class="option-row">
                     <input type="text" name="options" required>
-                    <button type="button" class="remove-option">Fjern</button>
+                    <button type="button" class="remove-option">-</button>
                 </div>
                 <div class="option-row">
                     <input type="text" name="options" required>
-                    <button type="button" class="remove-option">Fjern</button>
+                    <button type="button" class="remove-option">-</button>
                 </div>
-                {% endif %}
             </div>
-            <button type="button" id="add-option">Legg til alternativ</button>
+            <button type="button" id="add-option">+</button>
 
-            <label>
-                <input type="checkbox" name="is_anonymous"> Anonym avstemning
+            <br>
+            <br>
+
+            <label class="checkbox-row">
+                <input type="checkbox" name="is_anonymous" {% if is_anonymous %}checked{% endif %}> Anonym avstemning
             </label>
+
+            <label class="checkbox-row">
+                <input type="checkbox" name="allow_vote_changes" {% if allow_vote_changes %}checked{% endif %}>
+                Tillat at brukere kan endre stemmen sin senere
+            </label>
+
+            <div class="chart-picker">
+                <label>Tilgjengelige diagramtyper etter avstemning</label>
+                <p class="chart-picker-help">Klikk på knappene for å slå dem av eller på.</p>
+                <div class="chart-toggle-group" id="chart-toggle-group">
+                    {% for chart_type in available_chart_types %}
+                    <input type="checkbox" name="allowed_chart_types" value="{{ chart_type }}" {% if chart_type in
+                        selected_chart_types %}checked{% endif %} hidden>
+                    <button type="button"
+                        class="chart-toggle {% if chart_type in selected_chart_types %}active{% endif %}"
+                        data-chart-toggle="{{ chart_type }}">
+                        {{ chart_type }}
+                    </button>
+                    {% endfor %}
+                </div>
+            </div>
 
             <button type="submit">Opprett emne</button>
         </form>
     </div>
-
-    <script>
-        document.addEventListener("DOMContentLoaded", () => {
-            const addOptionButton = document.getElementById("add-option");
-            const optionsContainer = document.getElementById("options-container");
-
-            const updateRemoveButtons = () => {
-                const rows = optionsContainer.querySelectorAll(".option-row");
-                const canRemove = rows.length > 2;
-                rows.forEach(row => {
-                    const btn = row.querySelector(".remove-option");
-                    if (btn) {
-                        btn.disabled = !canRemove;
-                        btn.style.visibility = canRemove ? "visible" : "hidden";
-                    }
-                });
-            };
-
-            if (addOptionButton && optionsContainer) {
-                addOptionButton.addEventListener("click", () => {
-                    const row = document.createElement("div");
-                    row.className = "option-row";
-
-                    const input = document.createElement("input");
-                    input.type = "text";
-                    input.name = "options";
-                    input.required = true;
-
-                    const removeButton = document.createElement("button");
-                    removeButton.type = "button";
-                    removeButton.className = "remove-option";
-                    removeButton.textContent = "Fjern";
-                    removeButton.addEventListener("click", () => {
-                        row.remove();
-                        updateRemoveButtons();
-                    });
-
-                    row.appendChild(input);
-                    row.appendChild(removeButton);
-                    optionsContainer.appendChild(row);
-                    updateRemoveButtons();
-                });
-
-                optionsContainer.addEventListener("click", (event) => {
-                    if (event.target.classList.contains("remove-option")) {
-                        const row = event.target.closest(".option-row");
-                        if (row) {
-                            row.remove();
-                            updateRemoveButtons();
-                        }
-                    }
-                });
-
-                updateRemoveButtons();
-            }
-        });
-    </script>
 
     <script src="{{ url_for('static', filename='script.js') }}"></script>
 </body>

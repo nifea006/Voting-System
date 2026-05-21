@@ -1,4 +1,5 @@
 from flask import Flask, render_template, request, redirect, session, jsonify
+import hashlib
 import mysql.connector
 from dotenv import load_dotenv
 import os
@@ -18,6 +19,7 @@ SECRET_KEY = os.getenv("SECRET_KEY") or "a_super_secret_key"
 app.secret_key = SECRET_KEY
 BASE_DIR = Path(__file__).resolve().parent
 SAMPLE_SUBJECTS_SQL = BASE_DIR / "sample_subjects.sql"
+AVAILABLE_CHART_TYPES = ["bar", "doughnut", "line", "polarArea", "radar"]
 
 
 # -------------------
@@ -30,106 +32,6 @@ def get_db_connection():
         password=DB_PASSWORD or "your_password",
         database=DB_VOTING_SYSTEM or "your_database_name",
     )
-
-
-# -------------
-# Create Tables
-# -------------
-def create_tables():
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    # Users Table
-    cursor.execute(
-        """
-        CREATE TABLE IF NOT EXISTS users (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            username VARCHAR(255) NOT NULL,
-            password_hash VARCHAR(255) NOT NULL,
-            email VARCHAR(255) UNIQUE NOT NULL,
-            phone VARCHAR(20) UNIQUE,
-            is_admin BOOLEAN DEFAULT FALSE
-        );
-    """
-    )
-    # Subjects Table
-    cursor.execute(
-        """
-        CREATE TABLE IF NOT EXISTS subjects (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            title VARCHAR(255) NOT NULL,
-            description TEXT,
-            is_anonymous BOOLEAN DEFAULT FALSE,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            created_by INT,
-            FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
-        );
-    """
-    )
-    # Subject Options Table
-    cursor.execute(
-        """
-        CREATE TABLE IF NOT EXISTS subject_options (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            subject_id INT NOT NULL,
-            label VARCHAR(255) NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (subject_id) REFERENCES subjects(id) ON DELETE CASCADE
-        );
-    """
-    )
-    # Votes Table
-    cursor.execute(
-        """
-        CREATE TABLE IF NOT EXISTS votes (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            subject_id INT NOT NULL,
-            user_id INT NOT NULL,
-            option_id INT NOT NULL,
-            voted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (subject_id) REFERENCES subjects(id) ON DELETE CASCADE,
-            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-            FOREIGN KEY (option_id) REFERENCES subject_options(id) ON DELETE CASCADE,
-            UNIQUE (subject_id, user_id)
-        );
-    """
-    )
-    conn.commit()
-    cursor.close()
-    conn.close()
-
-
-def seed_sample_subjects():
-    if not SAMPLE_SUBJECTS_SQL.exists():
-        return
-
-    conn = get_db_connection()
-    cursor = conn.cursor(dictionary=True)
-    cursor.execute("SELECT COUNT(*) AS total FROM subjects")
-    subject_count = cursor.fetchone()["total"]
-    cursor.close()
-
-    if subject_count > 0:
-        conn.close()
-        return
-
-    cursor = conn.cursor()
-    with SAMPLE_SUBJECTS_SQL.open("r", encoding="utf-8") as sql_file:
-        statement_lines = []
-        for line in sql_file:
-            stripped_line = line.strip()
-            if not stripped_line or stripped_line.startswith("--"):
-                continue
-
-            statement_lines.append(line.rstrip())
-            if stripped_line.endswith(";"):
-                statement = " ".join(statement_lines).strip()
-                cursor.execute(statement[:-1])
-                statement_lines = []
-
-    conn.commit()
-    cursor.close()
-    conn.close()
-
 
 # ----------------
 # Helper Functions
@@ -156,6 +58,83 @@ def get_option_statistics(subject_id):
     return options, total_votes
 
 
+def get_option_voters(subject_id):
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    cursor.execute(
+        """
+        SELECT
+            subject_options.id,
+            subject_options.label,
+            users.username
+        FROM subject_options
+        LEFT JOIN votes
+            ON votes.option_id = subject_options.id
+            AND votes.subject_id = subject_options.subject_id
+        LEFT JOIN users
+            ON users.id = CAST(votes.user_id AS UNSIGNED)
+        WHERE subject_options.subject_id = %s
+        ORDER BY subject_options.id, users.username;
+    """,
+        (subject_id,),
+    )
+    rows = cursor.fetchall()
+    cursor.close()
+    conn.close()
+
+    voters_by_option = {}
+    for row in rows:
+        option_id = row["id"]
+        if option_id not in voters_by_option:
+            voters_by_option[option_id] = {
+                "id": option_id,
+                "label": row["label"],
+                "voters": [],
+            }
+
+        if row["username"]:
+            voters_by_option[option_id]["voters"].append(row["username"])
+
+    return list(voters_by_option.values())
+
+
+def get_form_text(name):
+    return (request.form.get(name) or "").strip()
+
+
+def normalize_chart_types(chart_types):
+    normalized = []
+
+    for chart_type in chart_types:
+        if chart_type in AVAILABLE_CHART_TYPES and chart_type not in normalized:
+            normalized.append(chart_type)
+
+    return normalized
+
+
+def get_selected_chart_types_from_form():
+    return normalize_chart_types(request.form.getlist("allowed_chart_types"))
+
+
+def parse_subject_chart_types(subject):
+    chart_types = normalize_chart_types(
+        (subject.get("allowed_chart_types") or "").split(",")
+    )
+
+    if chart_types:
+        return chart_types
+
+    return AVAILABLE_CHART_TYPES.copy()
+
+
+def get_vote_user_id(subject, username, user_id):
+    if subject.get("is_anonymous"):
+        anonymous_source = f"{SECRET_KEY}:{subject['id']}:{username}"
+        return hashlib.sha256(anonymous_source.encode("utf-8")).hexdigest()
+
+    return str(user_id)
+
+
 # --------------
 #    Routes
 # --------------
@@ -172,8 +151,8 @@ def home():
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
-        username_input = request.form.get("username").strip()
-        password_input = request.form.get("password")
+        username_input = get_form_text("username")
+        password_input = request.form.get("password") or ""
 
         if not username_input or not password_input:
             return render_template(
@@ -204,28 +183,25 @@ def login():
 @app.route("/register", methods=["GET", "POST"])
 def register():
     if request.method == "POST":
-        username = request.form.get("username").strip()
-        email = request.form.get("email").strip()
-        phone = request.form.get("phone").strip()
-        password = request.form.get("password")
-        confirm_password = request.form.get("confirm_password")
+        username = get_form_text("username").replace(" ", "")
+        email = get_form_text("email").replace(" ", "")
+        phone = get_form_text("phone").replace(" ", "")
+        password = request.form.get("password") or ""
+        confirm_password = request.form.get("confirm_password") or ""
 
         if not username or not email or not password:
             return render_template(
-                "manage_subject.html",
-                page="register",
+                "login.html",
                 error="Brukernavn, e-post og passord er påkrevd.",
             )
         if password != confirm_password:
             return render_template(
-                "manage_subject.html",
-                page="register",
+                "login.html",
                 error="Passordene samsvarer ikke.",
             )
         if len(password) < 6:
             return render_template(
-                "manage_subject.html",
-                page="register",
+                "login.html",
                 error="Passordet må være minst 6 tegn.",
             )
 
@@ -239,8 +215,7 @@ def register():
             cursor.close()
             conn.close()
             return render_template(
-                "manage_subject.html",
-                page="register",
+                "login.html",
                 error="Brukernavn eller e-post er allerede i bruk.",
             )
 
@@ -255,6 +230,7 @@ def register():
             """,
                 (username, password_hash, email, phone),
             )
+            user_id = cursor.lastrowid
             conn.commit()
             cursor.close()
             conn.close()
@@ -262,14 +238,16 @@ def register():
             cursor.close()
             conn.close()
             return render_template(
-                "manage_subject.html",
-                page="register",
+                "login.html",
                 error="Kunne ikke opprette konto. Prøv igjen.",
             )
 
-        return redirect("/login")
+        session["user_id"] = user_id
+        session["username"] = username
+        session["is_admin"] = False
+        return redirect("/main-menu")
 
-    return render_template("manage_subject.html", page="register")
+    return render_template("login.html")
 
 
 @app.route("/logout")
@@ -278,9 +256,9 @@ def logout():
     return redirect("/login")
 
 
-# -------------
-# Control Panel
-# -------------
+# ---------
+# Main menu
+# ---------
 @app.route("/main-menu")
 def main_menu():
     if "user_id" not in session or "username" not in session:
@@ -305,9 +283,11 @@ def create_subject():
         return redirect("/login")
 
     if request.method == "POST":
-        title = request.form.get("title").strip()
-        description = request.form.get("description").strip()
+        title = get_form_text("title")
+        description = get_form_text("description")
         is_anonymous = 1 if request.form.get("is_anonymous") else 0
+        allow_vote_changes = 1 if request.form.get("allow_vote_changes") else 0
+        allowed_chart_types = get_selected_chart_types_from_form()
         options = [
             option.strip()
             for option in request.form.getlist("options")
@@ -316,26 +296,63 @@ def create_subject():
 
         if not title:
             return render_template(
-                "manage_subject.html", page="create_subject", error="Tittel er påkrevd."
+                "opprett_emne.html",
+                error="Tittel er påkrevd.",
+                title=title,
+                description=description,
+                options=options,
+                is_anonymous=bool(is_anonymous),
+                allow_vote_changes=bool(allow_vote_changes),
+                selected_chart_types=allowed_chart_types,
+                available_chart_types=AVAILABLE_CHART_TYPES,
             )
         if len(options) < 2:
             return render_template(
-                "manage_subject.html",
-                page="create_subject",
+                "opprett_emne.html",
                 error="Minst 2 alternativer er påkrevd.",
                 title=title,
                 description=description,
                 options=options,
+                is_anonymous=bool(is_anonymous),
+                allow_vote_changes=bool(allow_vote_changes),
+                selected_chart_types=allowed_chart_types,
+                available_chart_types=AVAILABLE_CHART_TYPES,
+            )
+        if not allowed_chart_types:
+            return render_template(
+                "opprett_emne.html",
+                error="Velg minst en diagramtype.",
+                title=title,
+                description=description,
+                options=options,
+                is_anonymous=bool(is_anonymous),
+                allow_vote_changes=bool(allow_vote_changes),
+                selected_chart_types=allowed_chart_types,
+                available_chart_types=AVAILABLE_CHART_TYPES,
             )
 
         conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute(
             """
-            INSERT INTO subjects (title, description, is_anonymous, created_by)
-            VALUES (%s, %s, %s, %s)
+            INSERT INTO subjects (
+                title,
+                description,
+                is_anonymous,
+                allow_vote_changes,
+                allowed_chart_types,
+                created_by
+            )
+            VALUES (%s, %s, %s, %s, %s, %s)
         """,
-            (title, description, is_anonymous, session["user_id"]),
+            (
+                title,
+                description,
+                is_anonymous,
+                allow_vote_changes,
+                ",".join(allowed_chart_types),
+                session["user_id"],
+            ),
         )
         subject_id = cursor.lastrowid
         option_rows = [(subject_id, option) for option in options]
@@ -352,7 +369,12 @@ def create_subject():
 
         return redirect("/main-menu")
 
-    return render_template("manage_subject.html", page="create_subject")
+    return render_template(
+        "opprett_emne.html",
+        allow_vote_changes=False,
+        available_chart_types=AVAILABLE_CHART_TYPES,
+        selected_chart_types=AVAILABLE_CHART_TYPES,
+    )
 
 
 # --------------
@@ -371,7 +393,7 @@ def delete_subject(subject_id):
         cursor.close()
         conn.close()
         return "Emne ikke funnet", 404
-    if ["created_by"] != session["user_id"] and not session.get("is_admin"):
+    if subject["created_by"] != session["user_id"] and not session.get("is_admin"):
         cursor.close()
         conn.close()
         return "Du har ikke tilgang til dette emnet.", 403
@@ -382,7 +404,7 @@ def delete_subject(subject_id):
     cursor.close()
     conn.close()
 
-    return redirect(request.referrer)
+    return redirect(request.referrer or "/main-menu")
 
 
 # -----------
@@ -395,10 +417,23 @@ def vote_page(subject_id):
 
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
-    cursor.execute("SELECT * FROM subjects WHERE id = %s", (subject_id,))
+    cursor.execute(
+        """
+        SELECT subjects.*, users.username AS creator_username
+        FROM subjects
+        LEFT JOIN users ON users.id = subjects.created_by
+        WHERE subjects.id = %s
+    """,
+        (subject_id,),
+    )
     subject = cursor.fetchone()
     if not subject:
+        cursor.close()
+        conn.close()
         return "Emne ikke funnet", 404
+
+    vote_user_id = get_vote_user_id(subject, session["username"], session["user_id"])
+
     cursor.execute(
         "SELECT id, label FROM subject_options WHERE subject_id = %s ORDER BY id",
         (subject_id,),
@@ -406,7 +441,7 @@ def vote_page(subject_id):
     options = cursor.fetchall()
     cursor.execute(
         "SELECT option_id FROM votes WHERE subject_id = %s AND user_id = %s",
-        (subject_id, session["user_id"]),
+        (subject_id, vote_user_id),
     )
     user_vote = cursor.fetchone()
     cursor.close()
@@ -414,6 +449,12 @@ def vote_page(subject_id):
 
     vote_stats, total_votes = get_option_statistics(subject_id)
     selected_option_id = user_vote["option_id"] if user_vote else None
+    voter_lists = []
+    show_voter_lists = bool(selected_option_id and not subject.get("is_anonymous"))
+    allowed_chart_types = parse_subject_chart_types(subject)
+
+    if show_voter_lists:
+        voter_lists = get_option_voters(subject_id)
 
     return render_template(
         "avstemning.html",
@@ -422,6 +463,9 @@ def vote_page(subject_id):
         vote_stats=vote_stats,
         total_votes=total_votes,
         selected_option_id=selected_option_id,
+        voter_lists=voter_lists,
+        show_voter_lists=show_voter_lists,
+        allowed_chart_types=allowed_chart_types,
     )
 
 
@@ -429,34 +473,70 @@ def vote_page(subject_id):
 def vote():
     if "user_id" not in session or "username" not in session:
         return redirect("/login")
-    user_id = session["user_id"]
-    subject_id = request.form.get("subject_id")
-    option_id = request.form.get("option_id")
+    subject_id = get_form_text("subject_id")
+    option_id = get_form_text("option_id")
 
-    if not option_id:
+    if not subject_id or not option_id:
         return jsonify({"status": "error", "message": "Velg et alternativ."})
 
     try:
         conn = get_db_connection()
         cursor = conn.cursor(dictionary=True)
         cursor.execute(
-            "SELECT id FROM subject_options WHERE id = %s AND subject_id = %s",
-            (option_id, subject_id),
+            """
+            SELECT subjects.id, subjects.is_anonymous, subjects.allow_vote_changes
+            FROM subjects
+            JOIN subject_options ON subject_options.subject_id = subjects.id
+            WHERE subjects.id = %s AND subject_options.id = %s
+        """,
+            (subject_id, option_id),
         )
-        if not cursor.fetchone():
+        subject = cursor.fetchone()
+        if not subject:
             cursor.close()
             conn.close()
             return jsonify({"status": "error", "message": "Ugyldig alternativ."})
 
-        cursor = conn.cursor()
-        cursor.execute(
-            """
-            INSERT INTO votes (subject_id, user_id, option_id)
-            VALUES (%s, %s, %s)
-            ON DUPLICATE KEY UPDATE option_id = VALUES(option_id), voted_at = CURRENT_TIMESTAMP
-        """,
-            (subject_id, user_id, option_id),
+        vote_user_id = get_vote_user_id(
+            subject,
+            session["username"],
+            session["user_id"],
         )
+
+        cursor.execute(
+            "SELECT option_id FROM votes WHERE subject_id = %s AND user_id = %s",
+            (subject_id, vote_user_id),
+        )
+        existing_vote = cursor.fetchone()
+
+        if existing_vote and not subject.get("allow_vote_changes"):
+            cursor.close()
+            conn.close()
+            return jsonify(
+                {
+                    "status": "error",
+                    "message": "Denne avstemningen tillater ikke at du endrer stemmen din.",
+                }
+            )
+
+        cursor = conn.cursor()
+        if existing_vote:
+            cursor.execute(
+                """
+                UPDATE votes
+                SET option_id = %s, voted_at = CURRENT_TIMESTAMP
+                WHERE subject_id = %s AND user_id = %s
+            """,
+                (option_id, subject_id, vote_user_id),
+            )
+        else:
+            cursor.execute(
+                """
+                INSERT INTO votes (subject_id, user_id, option_id)
+                VALUES (%s, %s, %s)
+            """,
+                (subject_id, vote_user_id, option_id),
+            )
         conn.commit()
         cursor.close()
         conn.close()
@@ -464,6 +544,11 @@ def vote():
         return jsonify({"status": "error", "message": str(e)})
 
     vote_stats, total_votes = get_option_statistics(subject_id)
+    voter_lists = []
+    show_voter_lists = not subject.get("is_anonymous")
+    allowed_chart_types = parse_subject_chart_types(subject)
+    if show_voter_lists:
+        voter_lists = get_option_voters(subject_id)
 
     return jsonify(
         {
@@ -471,6 +556,10 @@ def vote():
             "total": total_votes,
             "options": vote_stats,
             "has_voted": True,
+            "show_voter_lists": show_voter_lists,
+            "voter_lists": voter_lists,
+            "allow_vote_changes": bool(subject.get("allow_vote_changes")),
+            "allowed_chart_types": allowed_chart_types,
         }
     )
 
@@ -487,12 +576,12 @@ def profile():
     message = None
 
     if request.method == "POST":
-        username = request.form.get("username").strip()
-        email = request.form.get("email").strip()
-        phone = request.form.get("phone").strip()
-        current_password = request.form.get("current_password")
-        new_password = request.form.get("new_password")
-        confirm_password = request.form.get("confirm_password")
+        username = get_form_text("username")
+        email = get_form_text("email")
+        phone = get_form_text("phone")
+        current_password = request.form.get("current_password") or ""
+        new_password = request.form.get("new_password") or ""
+        confirm_password = request.form.get("confirm_password") or ""
 
         if not username or not email:
             error = "Brukernavn og e-post er påkrevd."
@@ -567,7 +656,7 @@ def profile():
         JOIN votes ON votes.subject_id = subjects.id
         WHERE votes.user_id = %s
     """,
-        (user_id,),
+        (str(user_id),),
     )
     voted_subjects = cursor.fetchall()
     cursor.close()
@@ -584,6 +673,4 @@ def profile():
 
 
 if __name__ == "__main__":
-    create_tables()
-    seed_sample_subjects()
     app.run(host="0.0.0.0", port=5000, debug=True)

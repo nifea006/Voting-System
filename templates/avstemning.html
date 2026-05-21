@@ -11,54 +11,118 @@
 <body>
     {% include "navbar.html" %}
 
-    <div class="page-container">
-        <h2>{{ subject.title }}</h2>
-        <p>{{ subject.description }}</p>
-
-        <section name="selectChartType" id="selectChartType">
-            <button type="button" class="bar" onclick="updateVoteChart(null, 'bar')">Bar</button>
-            <button type="button" class="doughnut" onclick="updateVoteChart(null, 'doughnut')">Doughnut</button>
-            <button type="button" class="line" onclick="updateVoteChart(null, 'line')">Line</button>
-            <button type="button" class="polarArea" onclick="updateVoteChart(null, 'polarArea')">Polar Area</button>
-            <button type="button" class="radar" onclick="updateVoteChart(null, 'radar')">Radar</button>
+    <div class="page-container vote-page">
+        <section class="vote-hero">
+            <span class="vote-kicker">Stemmesystem</span>
+            <h2>{{ subject.title }}</h2>
+            {% if subject.is_anonymous %}
+            <h3>Anonym avstemning</h3>
+            {% else %}
+            <h3>Av {{ subject.creator_username or "ukjent bruker" }}</h3>
+            {% endif %}
+            <p>{{ subject.description or "Velg alternativet du mener passer best, og se resultatene oppdatere seg med en
+                gang." }}</p>
         </section>
 
+        <div class="vote-layout">
+            <section class="vote-results">
+                <div class="vote-panel-header">
+                    <div>
+                        <h3>Live resultater</h3>
+                    </div>
+                    <span class="vote-badge"><span data-vote-count>{{ total_votes }}</span></span>
+                </div>
 
-        <div class="chart-container" id="vote-chart-container" {% if not selected_option_id %}hidden{% endif %}>
-            <canvas id="voteChart"></canvas>
+                <section name="selectChartType" id="selectChartType" class="chart-switcher">
+                    {% for chart_type in allowed_chart_types %}
+                    <button type="button" data-chart-type="{{ chart_type }}">{{ chart_type }}</button>
+                    {% endfor %}
+                </section>
+
+                <div class="chart-container" id="vote-chart-container" {% if not selected_option_id %}hidden{% endif %}>
+                    <canvas id="voteChart"></canvas>
+                </div>
+
+                <p class="vote-total" id="total-votes-row" {% if not selected_option_id %}hidden{% endif %}>
+                    Totalt antall stemmer: <span data-vote-count>{{ total_votes }}</span>
+                </p>
+            </section>
+
+            <section class="vote-form-panel">
+                <div class="vote-panel-header">
+                    <div>
+                        <h3>Gi stemmen din</h3>
+                        <p>
+                            {% if subject.allow_vote_changes %}
+                            Du kan endre valget ditt senere dersom avstemningen fortsatt er aktiv.
+                            {% else %}
+                            Denne avstemningen låser stemmen din etter at du har stemt.
+                            {% endif %}
+                        </p>
+                    </div>
+                </div>
+
+                <form class="form-card" data-vote-form data-subject-id="{{ subject.id }}"
+                    data-has-voted="{{ '1' if selected_option_id else '0' }}"
+                    data-allow-vote-changes="{{ 1 if subject.allow_vote_changes else 0 }}">
+                    {% if subject.is_anonymous %}
+                    <p class="form-note">Anonym avstemning</p>
+                    {% else %}
+                    <p class="form-note">Alle kan se hva du stemmer på</p>
+                    {% endif %}
+                    <div class="option-list">
+                        {% for option in options %}
+                        <label class="option-item">
+                            <input type="radio" name="option" value="{{ option.id }}" {{ 'checked' if
+                                option.id==selected_option_id }} {% if selected_option_id and not subject.allow_vote_changes %}disabled{% endif %} required>
+                            {{ option.label }}
+                        </label>
+                        {% endfor %}
+                    </div>
+                    <button type="submit" id="vote-submit" {% if selected_option_id and not subject.allow_vote_changes %}disabled{% endif %}>
+                        {% if selected_option_id and not subject.allow_vote_changes %}
+                        Stem registrert
+                        {% elif selected_option_id and subject.allow_vote_changes %}
+                        Endre stemme
+                        {% else %}
+                        Stem
+                        {% endif %}
+                    </button>
+                </form>
+            </section>
         </div>
 
-        <br>
+        <section class="vote-results" id="voter-list-section" {% if not show_voter_lists %}hidden{% endif %}>
+            <div class="vote-panel-header">
+                <div>
+                    <h3>Hvem har stemt på hva</h3>
+                </div>
+            </div>
 
-        <form onsubmit="event.preventDefault(); submitVote('{{ subject.id }}')" class="form-card"
-            data-has-voted="{{ '1' if selected_option_id else '0' }}">
-            {% if subject.is_anonymous %}
-            <p class="form-note">Anonym avstemning</p>
-            {% endif %}
-            <div class="option-list">
-                {% for option in options %}
-                <label class="option-item">
-                    <input type="radio" name="option" value="{{ option.id }}" {{ 'checked' if
-                        option.id==selected_option_id }} required>
-                    {{ option.label }}
-                </label>
+            <div id="voter-list-container" class="voter-list-grid">
+                {% for option in voter_lists %}
+                <article class="voter-list-card">
+                    <h4>{{ option.label }}</h4>
+                    {% if option.voters %}
+                    <ul>
+                        {% for voter in option.voters %}
+                        <li>{{ voter }}</li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    <p>Ingen stemmer ennå.</p>
+                    {% endif %}
+                </article>
                 {% endfor %}
             </div>
-            <button type="submit" id="vote-submit">Stem</button>
-        </form>
-
-        <p id="total-votes-row" {% if not selected_option_id %}hidden{% endif %}>
-            Totalt antall stemmer: <span id="vote-count">{{ total_votes }}</span>
-        </p>
+        </section>
     </div>
 
     <div id="vote-data" data-initial-vote='{{ {"options": vote_stats, "total": total_votes} | tojson }}'
-        data-has-voted="{{ 1 if selected_option_id else 0 }}"></div>
+        data-has-voted="{{ 1 if selected_option_id else 0 }}"
+        data-allowed-chart-types='{{ allowed_chart_types | tojson }}'></div>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="{{ url_for('static', filename='script.js') }}"></script>
-</body>
-
-</html>
 </body>
 
 </html>

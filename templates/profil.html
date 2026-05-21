@@ -29,6 +29,9 @@
             <p><strong>Telefon:</strong> {{ user.phone or "Ikke satt" }}</p>
         </div>
 
+        <br>
+        <br>
+
         <h3>Rediger profil</h3>
         <form method="POST" class="form-card">
             <label>Brukernavn</label>
@@ -52,6 +55,9 @@
             <button type="submit">Lagre endringer</button>
         </form>
 
+        <br>
+        <br>
+
         <h3>Emner du har opprettet</h3>
         <div class="card-grid">
             {% if created_subjects %}
@@ -59,11 +65,13 @@
             <div class="card">
                 <h3>{{ subject.title }}</h3>
                 <p>{{ subject.description }}</p>
-                <a href="/vote/{{ subject.id }}" class="button">Åpne</a>
-                <form method="POST" action="/subject/{{ subject.id }}/delete"
-                    onsubmit="return confirm('Er du sikker på at du vil slette dette emnet?')">
-                    <button type="submit" class="button button-danger">Slett</button>
+                <a href="{{ url_for('vote_page', subject_id=subject.id) }}">Åpen</a>
+                {% if session.get('is_admin') or subject.created_by == session.get('user_id') %}
+                <form method="POST" action="{{ url_for('delete_subject', subject_id=subject.id) }}"
+                    data-confirm-message="Er du sikker på at du vil slette dette emnet?">
+                    <button type="submit" style="width: 100%;">Slett</button>
                 </form>
+                {% endif %}
             </div>
             {% endfor %}
             {% else %}
@@ -71,14 +79,22 @@
             {% endif %}
         </div>
 
+        <br>
+        <br>
+
         <h3>Emner du har stemt på</h3>
         <div class="card-grid">
             {% if voted_subjects %}
             {% for subject in voted_subjects %}
             <div class="card">
                 <h3>{{ subject.title }}</h3>
+                {% if subject.is_anonymous %}
+                <label>Anonym avstemning</label>
+                {% else %}
+                <label>Av {{ subject.creator_username or "ukjent bruker" }}</label>
+                {% endif %}
                 <p>{{ subject.description }}</p>
-                <a href="/vote/{{ subject.id }}" class="button">Åpne</a>
+                <a href="{{ url_for('vote_page', subject_id=subject.id) }}">Åpne</a>
             </div>
             {% endfor %}
             {% else %}
