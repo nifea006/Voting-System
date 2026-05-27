@@ -43,8 +43,9 @@ I also use `session` in Flask to handle authentication and protect pages that re
 
 ### 1. Create and activate a virtual environment and install the dependencies
 
+### Windows
+
 ```bash
-//Windows:
 python -m venv .venv
 .venv\Scripts\Activate
 pip install -r requirements.txt
@@ -60,7 +61,7 @@ pip install -r requirements.txt
 
 ### 2. Database Setup
 
-Fill out the database properties in [`app.py`](/app.py#L26). It must be a MySQL-type database such as MySQL or MariaDB.
+Fill out the database properties in [`app.py`](/app.py#L26) and [`setup.py`](/setup.py#L20). It must be a MySQL-type database such as MySQL or MariaDB.
 
 ```python
 # -------------------
@@ -75,27 +76,35 @@ def get_db_connection():
     )
 ```
 
-Alternatively, you can create and use a .env file to store the database properties:
+Alternatively, you can create and use a .env file to store the database and secret key properties:
 
 ```text
-    DB_HOST = "localhost"
-    DB_USER = "your_user_name"
-    DB_PASSWORD = "your_password"
-    DB_VOTING_SYSTEM = "your_database_name"
+DB_HOST = "localhost"
+DB_USER = "your_user_name"
+DB_PASSWORD = "your_password"
+DB_VOTING_SYSTEM = "your_database_name"
 ```
 
 ### 3. Run the App
 
 After the database has been set up:
 
+Run `setup.py` and press 1 to setup the tables only or 2 to setup the tables and some example data.
+
 ```powershell
-    python app.py
+python setup.py
+```
+
+Then you can run `app.py` to start the app.
+
+```powershell
+python app.py
 ```
 
 The app runs at:
 
 ```text
-    http://127.0.0.1:5000
+http://127.0.0.1:5000
 ```
 
 ## Example Data Notes

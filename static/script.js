@@ -212,8 +212,36 @@ function submitVote(subjectId) {
             option_id: selectedOption.value
         })
     })
-        .then((response) => response.json())
+        .then(async (response) => {
+            let data = null;
+
+            try {
+                data = await response.json();
+            } catch (error) {
+                if (response.status === 401) {
+                    window.location.href = "/login";
+                    return null;
+                }
+
+                throw new Error("Kunne ikke registrere stemmen. Prøv igjen.");
+            }
+
+            if (response.status === 401) {
+                window.location.href = "/login";
+                return null;
+            }
+
+            if (!response.ok) {
+                throw new Error(data?.message || "Kunne ikke registrere stemmen. Prøv igjen.");
+            }
+
+            return data;
+        })
         .then((data) => {
+            if (!data) {
+                return;
+            }
+
             if (data.status !== "success") {
                 alert(data.message);
                 return;
@@ -226,6 +254,9 @@ function submitVote(subjectId) {
             if (data.show_voter_lists) {
                 renderVoterLists(data.voter_lists || []);
             }
+        })
+        .catch((error) => {
+            alert(error.message || "Kunne ikke registrere stemmen. Prøv igjen.");
         });
 }
 

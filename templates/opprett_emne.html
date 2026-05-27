@@ -27,14 +27,12 @@
 
             <label>Alternativer (minst 2)</label>
             <div id="options-container">
+                {% for option in options %}
                 <div class="option-row">
-                    <input type="text" name="options" required>
+                    <input type="text" name="options" value="{{ option }}" required>
                     <button type="button" class="remove-option">-</button>
                 </div>
-                <div class="option-row">
-                    <input type="text" name="options" required>
-                    <button type="button" class="remove-option">-</button>
-                </div>
+                {% endfor %}
             </div>
             <button type="button" id="add-option">+</button>
 

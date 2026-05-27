@@ -127,13 +127,42 @@ def parse_subject_chart_types(subject):
     return AVAILABLE_CHART_TYPES.copy()
 
 
-def get_vote_user_id(subject, username, user_id):
+def build_subject_form_context(
+    *,
+    title="",
+    description="",
+    options=None,
+    is_anonymous=False,
+    allow_vote_changes=False,
+    selected_chart_types=None,
+    error=None,
+):
+    option_values = list(options or [])
+    while len(option_values) < 2:
+        option_values.append("")
+
+    return {
+        "error": error,
+        "title": title,
+        "description": description,
+        "options": option_values,
+        "is_anonymous": bool(is_anonymous),
+        "allow_vote_changes": bool(allow_vote_changes),
+        "selected_chart_types": (
+            AVAILABLE_CHART_TYPES
+            if selected_chart_types is None
+            else selected_chart_types
+        ),
+        "available_chart_types": AVAILABLE_CHART_TYPES,
+    }
+
+
+def get_vote_user_id(subject, user_id):
     if subject.get("is_anonymous"):
-        anonymous_source = f"{SECRET_KEY}:{subject['id']}:{username}"
+        anonymous_source = f"{SECRET_KEY}:{subject['id']}:{user_id}"
         return hashlib.sha256(anonymous_source.encode("utf-8")).hexdigest()
 
     return str(user_id)
-
 
 # --------------
 #    Routes
@@ -208,15 +237,37 @@ def register():
         conn = get_db_connection()
         cursor = conn.cursor(dictionary=True)
         cursor.execute(
-            "SELECT id FROM users WHERE username = %s OR email = %s", (username, email)
+            "SELECT id FROM users WHERE username = %s", (username)
         )
-        existing = cursor.fetchone()
-        if existing:
+        existing_username = cursor.fetchone()
+        if existing_username:
             cursor.close()
             conn.close()
             return render_template(
                 "login.html",
-                error="Brukernavn eller e-post er allerede i bruk.",
+                error="Brukernavnet er allerede i bruk.",
+            )
+        cursor.execute(
+            "SELECT id FROM users WHERE email = %s", (email)
+        )
+        existing_email = cursor.fetchone()
+        if existing_email:
+            cursor.close()
+            conn.close()
+            return render_template(
+                "login.html",
+                error="E-posten er allerede i bruk.",
+            )
+        cursor.execute(
+            "SELECT id FROM users WHERE phone = %s", (phone)
+        )
+        existing_phone = cursor.fetchone()
+        if existing_phone:
+            cursor.close()
+            conn.close()
+            return render_template(
+                "login.html",
+                error="Telefonnummeret er allerede i bruk.",
             )
 
         password_hash = generate_password_hash(password)
@@ -266,7 +317,14 @@ def main_menu():
 
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
-    cursor.execute("SELECT * FROM subjects ORDER BY created_at DESC;")
+    cursor.execute(
+        """
+        SELECT subjects.*, users.username AS creator_username
+        FROM subjects
+        LEFT JOIN users ON users.id = subjects.created_by
+        ORDER BY subjects.created_at DESC;
+    """
+    )
     subjects = cursor.fetchall()
     cursor.close()
     conn.close()
@@ -297,38 +355,41 @@ def create_subject():
         if not title:
             return render_template(
                 "opprett_emne.html",
-                error="Tittel er påkrevd.",
-                title=title,
-                description=description,
-                options=options,
-                is_anonymous=bool(is_anonymous),
-                allow_vote_changes=bool(allow_vote_changes),
-                selected_chart_types=allowed_chart_types,
-                available_chart_types=AVAILABLE_CHART_TYPES,
+                **build_subject_form_context(
+                    error="Tittel er påkrevd.",
+                    title=title,
+                    description=description,
+                    options=options,
+                    is_anonymous=is_anonymous,
+                    allow_vote_changes=allow_vote_changes,
+                    selected_chart_types=allowed_chart_types,
+                ),
             )
         if len(options) < 2:
             return render_template(
                 "opprett_emne.html",
-                error="Minst 2 alternativer er påkrevd.",
-                title=title,
-                description=description,
-                options=options,
-                is_anonymous=bool(is_anonymous),
-                allow_vote_changes=bool(allow_vote_changes),
-                selected_chart_types=allowed_chart_types,
-                available_chart_types=AVAILABLE_CHART_TYPES,
+                **build_subject_form_context(
+                    error="Minst 2 alternativer er påkrevd.",
+                    title=title,
+                    description=description,
+                    options=options,
+                    is_anonymous=is_anonymous,
+                    allow_vote_changes=allow_vote_changes,
+                    selected_chart_types=allowed_chart_types,
+                ),
             )
         if not allowed_chart_types:
             return render_template(
                 "opprett_emne.html",
-                error="Velg minst en diagramtype.",
-                title=title,
-                description=description,
-                options=options,
-                is_anonymous=bool(is_anonymous),
-                allow_vote_changes=bool(allow_vote_changes),
-                selected_chart_types=allowed_chart_types,
-                available_chart_types=AVAILABLE_CHART_TYPES,
+                **build_subject_form_context(
+                    error="Velg minst en diagramtype.",
+                    title=title,
+                    description=description,
+                    options=options,
+                    is_anonymous=is_anonymous,
+                    allow_vote_changes=allow_vote_changes,
+                    selected_chart_types=allowed_chart_types,
+                ),
             )
 
         conn = get_db_connection()
@@ -371,9 +432,7 @@ def create_subject():
 
     return render_template(
         "opprett_emne.html",
-        allow_vote_changes=False,
-        available_chart_types=AVAILABLE_CHART_TYPES,
-        selected_chart_types=AVAILABLE_CHART_TYPES,
+        **build_subject_form_context(),
     )
 
 
@@ -432,7 +491,8 @@ def vote_page(subject_id):
         conn.close()
         return "Emne ikke funnet", 404
 
-    vote_user_id = get_vote_user_id(subject, session["username"], session["user_id"])
+    vote_user_id = get_vote_user_id(subject, session["user_id"])
+    user_id = session["user_id"]
 
     cursor.execute(
         "SELECT id, label FROM subject_options WHERE subject_id = %s ORDER BY id",
@@ -440,8 +500,13 @@ def vote_page(subject_id):
     )
     options = cursor.fetchall()
     cursor.execute(
-        "SELECT option_id FROM votes WHERE subject_id = %s AND user_id = %s",
-        (subject_id, vote_user_id),
+        """
+        SELECT option_id
+        FROM votes
+        WHERE subject_id = %s AND user_id IN (%s, %s)
+        LIMIT 1
+    """,
+        (subject_id, vote_user_id, user_id or vote_user_id),
     )
     user_vote = cursor.fetchone()
     cursor.close()
@@ -472,7 +537,7 @@ def vote_page(subject_id):
 @app.route("/vote", methods=["POST"])
 def vote():
     if "user_id" not in session or "username" not in session:
-        return redirect("/login")
+        return jsonify({"status": "error", "message": "Logg inn for å stemme."}), 401
     subject_id = get_form_text("subject_id")
     option_id = get_form_text("option_id")
 
@@ -497,15 +562,17 @@ def vote():
             conn.close()
             return jsonify({"status": "error", "message": "Ugyldig alternativ."})
 
-        vote_user_id = get_vote_user_id(
-            subject,
-            session["username"],
-            session["user_id"],
-        )
+        vote_user_id = get_vote_user_id(subject, session["user_id"])
+        user_id = session["user_id"]
 
         cursor.execute(
-            "SELECT option_id FROM votes WHERE subject_id = %s AND user_id = %s",
-            (subject_id, vote_user_id),
+            """
+            SELECT option_id, user_id
+            FROM votes
+            WHERE subject_id = %s AND user_id IN (%s, %s)
+            LIMIT 1
+        """,
+            (subject_id, vote_user_id, user_id or vote_user_id),
         )
         existing_vote = cursor.fetchone()
 
@@ -524,10 +591,10 @@ def vote():
             cursor.execute(
                 """
                 UPDATE votes
-                SET option_id = %s, voted_at = CURRENT_TIMESTAMP
+                SET user_id = %s, option_id = %s, voted_at = CURRENT_TIMESTAMP
                 WHERE subject_id = %s AND user_id = %s
             """,
-                (option_id, subject_id, vote_user_id),
+                (vote_user_id, option_id, subject_id, existing_vote["user_id"]),
             )
         else:
             cursor.execute(
@@ -578,7 +645,7 @@ def profile():
     if request.method == "POST":
         username = get_form_text("username")
         email = get_form_text("email")
-        phone = get_form_text("phone")
+        phone = get_form_text("phone") or None
         current_password = request.form.get("current_password") or ""
         new_password = request.form.get("new_password") or ""
         confirm_password = request.form.get("confirm_password") or ""
@@ -600,21 +667,30 @@ def profile():
             conflict = cursor.fetchone()
             if conflict:
                 error = "Brukernavn eller e-post er allerede i bruk."
-            else:
-                password_hash = None
-                if new_password:
-                    cursor.execute(
-                        "SELECT password_hash FROM users WHERE id = %s", (user_id,)
-                    )
-                    user_row = cursor.fetchone()
-                    if not user_row or not check_password_hash(
-                        user_row["password_hash"], current_password
-                    ):
-                        error = "Nåværende passord er feil."
-                    else:
-                        password_hash = generate_password_hash(new_password)
+            if error is None and phone:
+                cursor.execute(
+                    "SELECT id FROM users WHERE phone = %s AND id != %s",
+                    (phone, user_id),
+                )
+                phone_conflict = cursor.fetchone()
+                if phone_conflict:
+                    error = "Telefonnummeret er allerede i bruk."
 
-                if error is None:
+            password_hash = None
+            if error is None and new_password:
+                cursor.execute(
+                    "SELECT password_hash FROM users WHERE id = %s", (user_id,)
+                )
+                user_row = cursor.fetchone()
+                if not user_row or not check_password_hash(
+                    user_row["password_hash"], current_password
+                ):
+                    error = "Nåværende passord er feil."
+                else:
+                    password_hash = generate_password_hash(new_password)
+
+            if error is None:
+                try:
                     if password_hash:
                         cursor.execute(
                             """
@@ -636,6 +712,8 @@ def profile():
                     conn.commit()
                     session["username"] = username
                     message = "Profil oppdatert."
+                except mysql.connector.Error:
+                    error = "Kunne ikke oppdatere profilen. Prøv igjen."
             cursor.close()
             conn.close()
 
@@ -651,9 +729,10 @@ def profile():
     # Subjects user voted on
     cursor.execute(
         """
-        SELECT subjects.*
+        SELECT subjects.*, users.username AS creator_username
         FROM subjects
         JOIN votes ON votes.subject_id = subjects.id
+        LEFT JOIN users ON users.id = subjects.created_by
         WHERE votes.user_id = %s
     """,
         (str(user_id),),
